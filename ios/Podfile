@@ -12,6 +12,8 @@ target 'RNPrinter' do
     :hermes_enabled => false
   )
 
+  pod 'RNCPicker', :path => '../node_modules/@react-native-picker/picker'
+
   target 'RNPrinterTests' do
     inherit! :complete
     # Pods for testing
@@ -21,7 +23,7 @@ target 'RNPrinter' do
   #
   # Note that if you have use_frameworks! enabled, Flipper will not work and
   # you should disable the next line.
-  use_flipper!()
+  # use_flipper!()
 
   post_install do |installer|
     react_native_post_install(installer)
