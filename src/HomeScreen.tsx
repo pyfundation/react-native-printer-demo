@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import {Picker} from '@react-native-picker/picker';
 import * as React from 'react';
 import {
@@ -8,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import {
   BLEPrinter,
@@ -18,6 +20,9 @@ import {
   INetPrinter,
 } from 'react-native-thermal-receipt-printer';
 import Loading from '../Loading';
+import {DeviceType} from './FindPrinter';
+import {navigate} from './App';
+import AntIcon from 'react-native-vector-icons/AntDesign';
 
 const printerList: Record<string, any> = {
   ble: BLEPrinter,
@@ -41,7 +46,7 @@ export enum DevicesEnum {
 const deviceWidth = Dimensions.get('window').width;
 // const deviceHeight = Dimensions.get('window').height;
 
-export default function HomeScreen() {
+export const HomeScreen = ({route}: any) => {
   const [selectedValue, setSelectedValue] = React.useState<
     keyof typeof printerList
   >(DevicesEnum.net);
@@ -51,57 +56,88 @@ export default function HomeScreen() {
   const [selectedPrinter, setSelectedPrinter] = React.useState<SelectedPrinter>(
     {},
   );
+  const [selectedNetPrinter, setSelectedNetPrinter] =
+    React.useState<DeviceType>({
+      device_name: 'My Net Printer',
+      host: '', // your host
+      port: PORT, // your port
+      printerType: DevicesEnum.net,
+    });
 
   React.useEffect(() => {
-    const getListDevices = async () => {
-      const Printer = printerList[selectedValue];
-      // get list device for net printers is support scanning in local ip but not recommended
-      if (selectedValue === DevicesEnum.net) {
-        await Printer.init();
-      }
+    // console.log(route.params?.printer);
+    if (route.params?.printer) {
+      setSelectedNetPrinter({
+        ...selectedNetPrinter,
+        ...route.params.printer,
+      });
+    }
+  }, [route.params?.printer]);
+
+  const getListDevices = async () => {
+    const Printer = printerList[selectedValue];
+    // get list device for net printers is support scanning in local ip but not recommended
+    if (selectedValue === DevicesEnum.net) {
+      await Printer.init();
+      setLoading(false);
+      return;
+    }
+    requestAnimationFrame(async () => {
       try {
-        setLoading(true);
         await Printer.init();
         const results = await Printer.getDeviceList();
-        console.log({results});
         setDevices(
-          results?.map((item: any) => ({...item, printerType: selectedValue})),
+          results?.map((item: any) => ({
+            ...item,
+            printerType: selectedValue,
+          })),
         );
       } catch (err) {
         console.warn(err);
       } finally {
         setLoading(false);
       }
-    };
-    getListDevices();
+    });
+  };
+
+  React.useEffect(() => {
+    setLoading(true);
+    getListDevices().then();
   }, [selectedValue]);
 
   const handlePort = (port?: string): string => {
-    return ((Platform.OS === 'ios' ? port : parseInt(port || '9100')) ||
+    return ((Platform.OS === 'ios' ? port : parseInt(port || '9100', 10)) ||
       '9100') as string;
   };
 
   const handleConnectSelectedPrinter = () => {
-    console.log({selectedPrinter});
-    if (!selectedPrinter) return;
     setLoading(true);
     const connect = async () => {
       try {
-        switch (selectedPrinter.printerType) {
+        switch (
+          selectedValue === DevicesEnum.net
+            ? selectedNetPrinter.printerType
+            : selectedPrinter.printerType
+        ) {
           case 'ble':
-            await BLEPrinter.connectPrinter(
-              selectedPrinter?.inner_mac_address || '',
-            );
+            if (selectedPrinter?.inner_mac_address) {
+              await BLEPrinter.connectPrinter(
+                selectedPrinter?.inner_mac_address || '',
+              );
+            }
             break;
           case 'net':
+            if (!selectedNetPrinter) {
+              break;
+            }
             try {
               if (connected) {
                 await NetPrinter.closeConn();
                 setConnected(!connected);
               }
               const status = await NetPrinter.connectPrinter(
-                selectedPrinter?.host || '',
-                handlePort(selectedPrinter?.port),
+                selectedNetPrinter?.host || '',
+                handlePort(selectedNetPrinter?.port),
               );
               setLoading(false);
               console.log('connect -> status', status);
@@ -111,14 +147,17 @@ export default function HomeScreen() {
               );
               setConnected(true);
             } catch (err) {
+              Alert.alert('Connect failed!', `${err} !`);
               console.log(err);
             }
             break;
           case 'usb':
-            await USBPrinter.connectPrinter(
-              selectedPrinter?.vendor_id || '',
-              selectedPrinter?.product_id || '',
-            );
+            if (selectedPrinter?.vendor_id) {
+              await USBPrinter.connectPrinter(
+                selectedPrinter?.vendor_id || '',
+                selectedPrinter?.product_id || '',
+              );
+            }
             break;
           default:
         }
@@ -134,7 +173,15 @@ export default function HomeScreen() {
   };
 
   const handlePrint = async () => {
-    console.log('printerList', printerList[selectedValue]);
+    try {
+      const Printer = printerList[selectedValue];
+      await Printer.printText('<C>sample text</C>\n');
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
+  const handlePrintBill = async () => {
     try {
       const Printer = printerList[selectedValue];
       await Printer.printText('<C>sample text</C>\n');
@@ -151,31 +198,63 @@ export default function HomeScreen() {
     setSelectedPrinter({});
   };
 
+  const findPrinter = () => {
+    navigate('Find');
+  };
+
+  const onChangeText = (text: string) => {
+    setSelectedNetPrinter({...selectedNetPrinter, host: text});
+  };
+
   const _renderNet = () => (
     <>
-      <TextInput />
+      <TextInput
+        style={{
+          borderBottomWidth: 1,
+        }}
+        placeholder={'Your printer port...'}
+        value={selectedNetPrinter?.host}
+        onChangeText={onChangeText}
+      />
+      <View
+        style={{
+          marginTop: 10,
+        }}>
+        <TouchableOpacity
+          style={[styles.button, {backgroundColor: 'grey', height: 30}]}
+          // disabled={!selectedPrinter?.device_name}
+          onPress={findPrinter}>
+          <AntIcon name={'search1'} color={'white'} size={18} />
+          <Text style={styles.text}>Find your printers</Text>
+        </TouchableOpacity>
+      </View>
     </>
   );
 
   const _renderOther = () => (
-    <Picker selectedValue={selectedPrinter} onValueChange={setSelectedPrinter}>
-      {devices !== undefined &&
-        devices?.length > 0 &&
-        devices?.map((item: any, index) => (
-          <Picker.Item
-            label={item.device_name}
-            value={item}
-            key={`printer-item-${index}`}
-          />
-        ))}
-    </Picker>
+    <>
+      <Text>Select printer: </Text>
+      <Picker
+        selectedValue={selectedPrinter}
+        onValueChange={setSelectedPrinter}>
+        {devices !== undefined &&
+          devices?.length > 0 &&
+          devices?.map((item: any, index) => (
+            <Picker.Item
+              label={item.device_name}
+              value={item}
+              key={`printer-item-${index}`}
+            />
+          ))}
+      </Picker>
+    </>
   );
 
   return (
     <View style={styles.container}>
       {/* Printers option */}
       <View style={styles.section}>
-        <Text>Select printer type: </Text>
+        <Text style={styles.title}>Select printer type: </Text>
         <Picker
           selectedValue={selectedValue}
           mode="dropdown"
@@ -191,36 +270,46 @@ export default function HomeScreen() {
       </View>
       {/* Printers List */}
       <View style={styles.section}>
-        <Text>Select printer: </Text>
         {selectedValue === 'net' ? _renderNet() : _renderOther()}
         {/* Buttons  */}
         <View
-          style={{
-            marginTop: 10,
-          }}>
+          style={[
+            styles.buttonContainer,
+            {
+              marginTop: 50,
+            },
+          ]}>
           <TouchableOpacity
             style={styles.button}
             // disabled={!selectedPrinter?.device_name}
             onPress={handleConnectSelectedPrinter}>
+            <AntIcon name={'disconnect'} color={'white'} size={18} />
             <Text style={styles.text}>Connect</Text>
           </TouchableOpacity>
         </View>
-        <View
-          style={{
-            marginTop: 10,
-          }}>
+        <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, {backgroundColor: 'blue'}]}
             // disabled={!selectedPrinter?.device_name}
             onPress={handlePrint}>
+            <AntIcon name={'printer'} color={'white'} size={18} />
             <Text style={styles.text}>Print sample</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, {backgroundColor: 'blue'}]}
+            // disabled={!selectedPrinter?.device_name}
+            onPress={handlePrintBill}>
+            <AntIcon name={'profile'} color={'white'} size={18} />
+            <Text style={styles.text}>Print bill</Text>
           </TouchableOpacity>
         </View>
       </View>
       <Loading loading={loading} />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -231,7 +320,11 @@ const styles = StyleSheet.create({
   rowDirection: {
     flexDirection: 'row',
   },
+  buttonContainer: {
+    marginTop: 10,
+  },
   button: {
+    flexDirection: 'row',
     height: 40,
     width: deviceWidth / 1.5,
     alignSelf: 'center',
@@ -243,5 +336,13 @@ const styles = StyleSheet.create({
   text: {
     color: 'white',
     fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  title: {
+    color: 'black',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
 });
