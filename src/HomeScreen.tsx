@@ -59,7 +59,7 @@ export const HomeScreen = ({route}: any) => {
   const [selectedNetPrinter, setSelectedNetPrinter] =
     React.useState<DeviceType>({
       device_name: 'My Net Printer',
-      host: '', // your host
+      host: '192.168.0.200', // your host
       port: PORT, // your port
       printerType: DevicesEnum.net,
     });
@@ -184,7 +184,11 @@ export const HomeScreen = ({route}: any) => {
   const handlePrintBill = async () => {
     try {
       const Printer = printerList[selectedValue];
-      await Printer.printText('<C>sample text</C>\n');
+      await Printer.printBill('<C>sample text</C>\n');
+      await Printer.printBill(
+        '<img alt="i" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFU7U2h0umyF0P6E_yhTX45sGgPEQAbGaJ4g&usqp=CAU">sample text</img>\n',
+      );
+      console.log(Printer);
     } catch (err) {
       console.warn(err);
     }

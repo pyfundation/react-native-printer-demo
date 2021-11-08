@@ -4,7 +4,6 @@ import {
   View,
   TouchableOpacity,
   Text,
-  InteractionManager,
 } from 'react-native';
 import {
   NetPrinterEventEmitter,
@@ -62,7 +61,7 @@ export const FindPrinter = () => {
   }, []);
 
   if (loading) {
-    return <Loading loading={true} />;
+    return <Loading loading={true} text={'Finding'} />;
   }
 
   const onSelectedPrinter = (printer: any) => {

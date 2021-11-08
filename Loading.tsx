@@ -1,5 +1,5 @@
 import React from 'react';
-import {StyleSheet, Modal, View, ActivityIndicator} from 'react-native';
+import {StyleSheet, Modal, View, ActivityIndicator, Text} from 'react-native';
 
 const styles = StyleSheet.create({
   modalBackground: {
@@ -22,9 +22,10 @@ const styles = StyleSheet.create({
 
 interface LoaderProps {
   loading: boolean;
+  text?: string;
 }
 
-const Loading: React.FC<LoaderProps> = ({loading}: LoaderProps) => {
+const Loading: React.FC<LoaderProps> = ({loading, text}: LoaderProps) => {
   const noop = () => {};
   return (
     <Modal
@@ -35,6 +36,7 @@ const Loading: React.FC<LoaderProps> = ({loading}: LoaderProps) => {
       <View style={styles.modalBackground}>
         <View style={styles.activityIndicatorWrapper}>
           <ActivityIndicator animating={loading} size="large" />
+          <Text>{text || 'Loading'}</Text>
         </View>
       </View>
     </Modal>
