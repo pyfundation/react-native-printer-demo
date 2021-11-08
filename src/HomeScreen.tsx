@@ -253,7 +253,6 @@ export const HomeScreen = ({route}: any) => {
       </Picker>
     </>
   );
-  
   return (
     <View style={styles.container}>
       {/* Printers option */}
